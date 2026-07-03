@@ -1,0 +1,6 @@
+target/
+env.ps1
+local.settings.json
+.vscode/
+INTEGRACION-REACT-NATIVE.md
+README-FUNCIONES-IA.md
