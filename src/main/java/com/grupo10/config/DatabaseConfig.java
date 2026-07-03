@@ -41,7 +41,7 @@ public class DatabaseConfig {
 
         // Carga de credenciales desde las variables de entorno de Azure
         String jdbcUrl = System.getenv("DB_URL");
-        String username = System.getenv("DB_USERNAME");
+        String username = System.getenv("DB_USER");
         String password = System.getenv("DB_PASSWORD");
 
         logger.info("Configurando conexión a la base de datos...");
