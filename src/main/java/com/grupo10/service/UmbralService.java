@@ -8,9 +8,13 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.logging.Logger;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
 /**
  * Servicio para gestionar los umbrales médicos personalizados de los pacientes.
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class UmbralService {
 
     private static final Logger logger = Logger.getLogger(UmbralService.class.getName());

@@ -10,9 +10,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
 /**
  * Servicio para consultar enfermedades crónicas de los pacientes.
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class EnfermedadService {
 
     private static final Logger logger = Logger.getLogger(EnfermedadService.class.getName());

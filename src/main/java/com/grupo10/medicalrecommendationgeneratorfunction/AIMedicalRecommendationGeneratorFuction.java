@@ -103,7 +103,7 @@ public class AIMedicalRecommendationGeneratorFuction {
      * @param idPaciente ID del paciente
      * @return true si se generó una recomendación, false en caso contrario
      */
-    private boolean generarRecomendacionPaciente(Long idPaciente) {
+    boolean generarRecomendacionPaciente(Long idPaciente) {
         logger.info("Generando recomendación para paciente ID: " + idPaciente);
 
         // Verificar si ya existe una recomendación reciente (últimos 2 días)
@@ -160,7 +160,7 @@ public class AIMedicalRecommendationGeneratorFuction {
     /**
      * Genera recomendaciones alimentarias usando IA basadas en las enfermedades.
      */
-    private String generarRecomendacionConIA(List<Enfermedad> enfermedades) throws Exception {
+    String generarRecomendacionConIA(List<Enfermedad> enfermedades) throws Exception {
         // Construir el prompt específico según las enfermedades
         StringBuilder prompt = new StringBuilder();
         prompt.append("Genera recomendaciones alimentarias breves (máximo 200 palabras) para un paciente con: ");
@@ -206,7 +206,7 @@ public class AIMedicalRecommendationGeneratorFuction {
     /**
      * Genera un título descriptivo para la recomendación.
      */
-    private String generarTituloRecomendacion(List<Enfermedad> enfermedades) {
+    String generarTituloRecomendacion(List<Enfermedad> enfermedades) {
         if (enfermedades.size() == 1) {
             String nombre = enfermedades.get(0).getNombreEnfermedad();
             return "Recomendaciones para " + nombre;

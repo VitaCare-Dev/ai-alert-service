@@ -13,19 +13,38 @@ import java.util.logging.Logger;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class GroqService {
     private static final Logger logger = Logger.getLogger(GroqService.class.getName());
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
-    private static final HttpClient httpClient = HttpClient.newBuilder()
+    // No son 'final': GroqServiceTest los reemplaza por un HttpClient
+    // mockeado y una API key de prueba (ver setHttpClientForTesting /
+    // setApiKeyForTesting) para poder cubrir consultarGroq sin hacer una
+    // llamada de red real a Groq. En producción nunca se llaman esos setters,
+    // así que el comportamiento no cambia.
+    private static HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .build();
 
     private static final String GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-    private static final String GROQ_API_KEY = System.getenv("GROQ_API_KEY");
+    private static String apiKey = System.getenv("GROQ_API_KEY");
+
+    /** Visible solo para tests: reemplaza el HttpClient real por uno mockeado. */
+    static void setHttpClientForTesting(HttpClient client) {
+        httpClient = client;
+    }
+
+    /** Visible solo para tests: evita depender de la variable de entorno real. */
+    static void setApiKeyForTesting(String key) {
+        apiKey = key;
+    }
 
     public static String consultarGroq(String prompt) throws Exception {
-        if (GROQ_API_KEY == null || GROQ_API_KEY.isBlank()) {
+        if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalStateException("La variable de entorno GROQ_API_KEY no está configurada.");
         }
 
@@ -44,7 +63,7 @@ public class GroqService {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(GROQ_API_URL))
                 .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer " + GROQ_API_KEY)
+                .header("Authorization", "Bearer " + apiKey)
                 .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
                 .timeout(Duration.ofSeconds(15))
                 .build();

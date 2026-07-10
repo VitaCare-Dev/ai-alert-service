@@ -21,16 +21,14 @@ public class DatabaseConfig {
     private static final Logger logger = Logger.getLogger(DatabaseConfig.class.getName());
     private static HikariDataSource dataSource;
 
-
-
-    static {
-        try {
-            initializeDataSource();
-        } catch (Exception e) {
-            logger.severe("Error al inicializar el pool de conexiones: " + e.getMessage());
-            throw new RuntimeException("Error al inicializar el pool de conexiones", e);
-        }
-    }
+    // Antes había un bloque static{} que llamaba a initializeDataSource() de
+    // inmediato al cargar la clase — eso intentaba una conexión real a Oracle
+    // en el momento en que la JVM referencia DatabaseConfig por primera vez
+    // (incluido cuando un test solo necesita mockear la clase), sin relación
+    // con si algún endpoint realmente iba a usar la base de datos. getDataSource()
+    // ya hace exactamente la misma inicialización de forma perezosa (ver abajo);
+    // el bloque static{} era redundante y, además, hacía imposible testear
+    // cualquier clase que dependiera de DatabaseConfig sin una BD real disponible.
 
     /**
      * Inicializa el pool de conexiones HikariCP.

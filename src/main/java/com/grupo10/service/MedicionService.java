@@ -13,11 +13,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
 /**
  * Servicio para consultar mediciones de salud de los pacientes.
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class MedicionService {
-    
+
     private static final Logger logger = Logger.getLogger(MedicionService.class.getName());
 
     /**

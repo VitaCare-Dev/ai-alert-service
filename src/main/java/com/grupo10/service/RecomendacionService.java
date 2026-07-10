@@ -9,11 +9,15 @@ import java.sql.ResultSet;
 import java.sql.Timestamp;
 import java.util.logging.Logger;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
 /**
  * Servicio para gestionar recomendaciones alimentarias generadas por IA.
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class RecomendacionService {
-    
+
     private static final Logger logger = Logger.getLogger(RecomendacionService.class.getName());
 
     /**

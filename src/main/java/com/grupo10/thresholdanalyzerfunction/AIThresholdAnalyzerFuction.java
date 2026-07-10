@@ -98,11 +98,15 @@ public class AIThresholdAnalyzerFuction {
 
     /**
      * Analiza las mediciones de un paciente y genera alertas si es necesario.
-     * 
+     *
+     * <p>Visibilidad de paquete (no {@code private}) para que
+     * {@code AIThresholdAnalyzerFuctionTest} pueda invocarla directamente sin
+     * reflexión; no cambia el contrato público de la clase.</p>
+     *
      * @param idPaciente ID del paciente a analizar
      * @return true si se generó una alerta, false en caso contrario
      */
-    private boolean analizarPaciente(Long idPaciente) {
+    boolean analizarPaciente(Long idPaciente) {
         logger.info("Analizando paciente ID: " + idPaciente);
 
         // Obtener umbrales configurados del paciente
@@ -154,8 +158,11 @@ public class AIThresholdAnalyzerFuction {
 
     /**
      * Cuenta cuántos días consecutivos hay en una lista de fechas.
+     *
+     * <p>Visibilidad de paquete (no {@code private}) para poder testear este
+     * algoritmo puro directamente, sin mockear nada.</p>
      */
-    private int contarDiasConsecutivos(List<LocalDateTime> fechas) {
+    int contarDiasConsecutivos(List<LocalDateTime> fechas) {
         if (fechas.size() < 2) {
             return fechas.size();
         }
@@ -181,8 +188,11 @@ public class AIThresholdAnalyzerFuction {
 
     /**
      * Cuenta cuántas mediciones de glucosa están fuera del umbral.
+     *
+     * <p>Visibilidad de paquete (no {@code private}) para poder testear este
+     * algoritmo puro directamente, sin mockear nada.</p>
      */
-    private int contarMedicionesGlucosaAlteradas(List<MedicionGlucosa> mediciones, UmbralMedico umbral) {
+    int contarMedicionesGlucosaAlteradas(List<MedicionGlucosa> mediciones, UmbralMedico umbral) {
         int contador = 0;
 
         for (MedicionGlucosa medicion : mediciones) {
@@ -201,8 +211,11 @@ public class AIThresholdAnalyzerFuction {
 
     /**
      * Cuenta cuántas mediciones de signos vitales están fuera del umbral.
+     *
+     * <p>Visibilidad de paquete (no {@code private}) para poder testear este
+     * algoritmo puro directamente, sin mockear nada.</p>
      */
-    private int contarMedicionesVitalesAlteradas(List<MedicionVitales> mediciones, UmbralMedico umbral) {
+    int contarMedicionesVitalesAlteradas(List<MedicionVitales> mediciones, UmbralMedico umbral) {
         int contador = 0;
 
         for (MedicionVitales medicion : mediciones) {

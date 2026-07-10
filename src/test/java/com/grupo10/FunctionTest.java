@@ -50,4 +50,28 @@ public class FunctionTest {
         // Verify
         assertEquals(HttpStatus.OK, ret.getStatus());
     }
+
+    @Test
+    public void testHttpTriggerJavaSinNombreDevuelveBadRequest() throws Exception {
+        @SuppressWarnings("unchecked")
+        final HttpRequestMessage<Optional<String>> req = mock(HttpRequestMessage.class);
+
+        doReturn(new HashMap<String, String>()).when(req).getQueryParameters();
+        doReturn(Optional.empty()).when(req).getBody();
+
+        doAnswer(new Answer<HttpResponseMessage.Builder>() {
+            @Override
+            public HttpResponseMessage.Builder answer(InvocationOnMock invocation) {
+                HttpStatus status = (HttpStatus) invocation.getArguments()[0];
+                return new HttpResponseMessageMock.HttpResponseMessageBuilderMock().status(status);
+            }
+        }).when(req).createResponseBuilder(any(HttpStatus.class));
+
+        final ExecutionContext context = mock(ExecutionContext.class);
+        doReturn(Logger.getGlobal()).when(context).getLogger();
+
+        final HttpResponseMessage ret = new Function().run(req, context);
+
+        assertEquals(HttpStatus.BAD_REQUEST, ret.getStatus());
+    }
 }

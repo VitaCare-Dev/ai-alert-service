@@ -15,7 +15,29 @@ env:
   JAVA_VERSION: '21' # set this to the java version to use
 
 jobs:
+  test:
+    name: Run tests (100% line coverage required)
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Checkout GitHub Action'
+        uses: actions/checkout@v4
+
+      - name: Setup Java Sdk ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      - name: Run tests and enforce 100% line coverage
+        shell: pwsh
+        run: |+
+          pushd './${{ env.PACKAGE_DIRECTORY }}'
+          mvn -B verify
+          popd
+
   build-and-deploy:
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       id-token: write #This is required for requesting the JWT
@@ -26,9 +48,11 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Java Sdk ${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v1
-        with: |+
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
           java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
 
       - name: 'Restore Project Dependencies Using Mvn'
         shell: pwsh

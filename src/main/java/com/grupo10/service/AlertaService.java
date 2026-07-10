@@ -9,11 +9,15 @@ import java.sql.ResultSet;
 import java.sql.Timestamp;
 import java.util.logging.Logger;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
 /**
  * Servicio para gestionar alertas de IA generadas para los pacientes.
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class AlertaService {
-    
+
     private static final Logger logger = Logger.getLogger(AlertaService.class.getName());
 
     /**
