@@ -7,6 +7,7 @@ import com.microsoft.azure.functions.*;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.List;
 import java.util.logging.Logger;
 
@@ -117,22 +118,6 @@ public class AIThresholdAnalyzerFuction {
             return false;
         }
 
-        // Verificar si hay mediciones en días consecutivos
-        List<LocalDateTime> fechasMediciones = MedicionService.verificarMedicionesConsecutivas(idPaciente, 3);
-
-        if (fechasMediciones.size() < 2) {
-            logger.info("Paciente ID " + idPaciente + " no tiene suficientes mediciones consecutivas.");
-            return false;
-        }
-
-        // Verificar si las fechas son consecutivas
-        int diasConsecutivos = contarDiasConsecutivos(fechasMediciones);
-
-        if (diasConsecutivos < 2) {
-            logger.info("Paciente ID " + idPaciente + " no tiene mediciones en días consecutivos.");
-            return false;
-        }
-
         // Analizar mediciones de glucosa
         List<MedicionGlucosa> medicionesGlucosa = MedicionService.obtenerMedicionesGlucosaRecientes(idPaciente, 3);
         int glucosaAlterada = contarMedicionesGlucosaAlteradas(medicionesGlucosa, umbral);
@@ -141,19 +126,26 @@ public class AIThresholdAnalyzerFuction {
         List<MedicionVitales> medicionesVitales = MedicionService.obtenerMedicionesVitalesRecientes(idPaciente, 3);
         int vitalesAlterados = contarMedicionesVitalesAlteradas(medicionesVitales, umbral);
 
-        // Si hay mediciones alteradas por 2 o más días, generar alerta
-        if (glucosaAlterada >= 2 || vitalesAlterados >= 2) {
-            // Evitar alertas duplicadas recientes
-            if (AlertaService.existeAlertaReciente(idPaciente, 24)) {
-                logger.info("Ya existe una alerta reciente para el paciente ID " + idPaciente);
-                return false;
-            }
+        // Días consecutivos en los que HUBO una alteración real (no cualquier
+        // control de salud): evita generar una alerta cuando las mediciones
+        // alteradas cayeron todas en un mismo día, o suprimir una alerta real
+        // porque hubo controles normales en días distintos.
+        int diasConsecutivosGlucosa = contarDiasConsecutivos(obtenerFechasGlucosaAlterada(medicionesGlucosa, umbral));
+        int diasConsecutivosVitales = contarDiasConsecutivos(obtenerFechasVitalesAlteradas(medicionesVitales, umbral));
 
-            return generarAlerta(idPaciente, diasConsecutivos, glucosaAlterada, vitalesAlterados, umbral);
+        if (diasConsecutivosGlucosa < 2 && diasConsecutivosVitales < 2) {
+            logger.info("Paciente ID " + idPaciente + " no tiene mediciones alteradas en días consecutivos.");
+            return false;
         }
 
-        logger.info("No se detectaron anomalías significativas para el paciente ID: " + idPaciente);
-        return false;
+        // Evitar alertas duplicadas recientes
+        if (AlertaService.existeAlertaReciente(idPaciente, 24)) {
+            logger.info("Ya existe una alerta reciente para el paciente ID " + idPaciente);
+            return false;
+        }
+
+        int diasConsecutivos = Math.max(diasConsecutivosGlucosa, diasConsecutivosVitales);
+        return generarAlerta(idPaciente, diasConsecutivos, glucosaAlterada, vitalesAlterados, umbral);
     }
 
     /**
@@ -196,17 +188,40 @@ public class AIThresholdAnalyzerFuction {
         int contador = 0;
 
         for (MedicionGlucosa medicion : mediciones) {
-            if (medicion.getGlucosa() == null) {
-                continue;
-            }
-            boolean sobreMaximo = umbral.getGlucosaMax() != null && medicion.getGlucosa() > umbral.getGlucosaMax();
-            boolean bajoMinimo = umbral.getGlucosaMin() != null && medicion.getGlucosa() < umbral.getGlucosaMin();
-            if (sobreMaximo || bajoMinimo) {
+            if (estaGlucosaAlterada(medicion, umbral)) {
                 contador++;
             }
         }
 
         return contador;
+    }
+
+    /**
+     * Determina si una medición de glucosa individual está fuera del umbral
+     * (sobre el máximo o bajo el mínimo configurado).
+     */
+    private boolean estaGlucosaAlterada(MedicionGlucosa medicion, UmbralMedico umbral) {
+        if (medicion.getGlucosa() == null) {
+            return false;
+        }
+        boolean sobreMaximo = umbral.getGlucosaMax() != null && medicion.getGlucosa() > umbral.getGlucosaMax();
+        boolean bajoMinimo = umbral.getGlucosaMin() != null && medicion.getGlucosa() < umbral.getGlucosaMin();
+        return sobreMaximo || bajoMinimo;
+    }
+
+    /**
+     * Obtiene, ordenadas de más reciente a más antigua, las fechas en las que
+     * hubo al menos una medición de glucosa alterada.
+     *
+     * <p>Visibilidad de paquete para poder testear este algoritmo directamente.</p>
+     */
+    List<LocalDateTime> obtenerFechasGlucosaAlterada(List<MedicionGlucosa> mediciones, UmbralMedico umbral) {
+        return mediciones.stream()
+                .filter(medicion -> estaGlucosaAlterada(medicion, umbral))
+                .map(MedicionGlucosa::getFechaHora)
+                .filter(java.util.Objects::nonNull)
+                .sorted(Comparator.reverseOrder())
+                .toList();
     }
 
     /**
@@ -219,29 +234,67 @@ public class AIThresholdAnalyzerFuction {
         int contador = 0;
 
         for (MedicionVitales medicion : mediciones) {
-            boolean alterado = false;
-
-            if (medicion.getPresionSistolica() != null && umbral.getSistolicaMax() != null &&
-                    medicion.getPresionSistolica() > umbral.getSistolicaMax()) {
-                alterado = true;
-            }
-
-            if (medicion.getPresionDiastolica() != null && umbral.getDiastolicaMax() != null &&
-                    medicion.getPresionDiastolica() > umbral.getDiastolicaMax()) {
-                alterado = true;
-            }
-
-            if (medicion.getTemperatura() != null && umbral.getTemperaturaMax() != null &&
-                    medicion.getTemperatura().compareTo(umbral.getTemperaturaMax()) > 0) {
-                alterado = true;
-            }
-
-            if (alterado) {
+            if (estanVitalesAlterados(medicion, umbral)) {
                 contador++;
             }
         }
 
         return contador;
+    }
+
+    /**
+     * Determina si una medición de signos vitales individual está fuera del
+     * umbral: por encima del máximo (hipertensión/fiebre) o por debajo del
+     * mínimo configurado (hipotensión/hipotermia).
+     */
+    private boolean estanVitalesAlterados(MedicionVitales medicion, UmbralMedico umbral) {
+        boolean alterado = false;
+
+        if (medicion.getPresionSistolica() != null) {
+            if (umbral.getSistolicaMax() != null && medicion.getPresionSistolica() > umbral.getSistolicaMax()) {
+                alterado = true;
+            }
+            if (umbral.getSistolicaMin() != null && medicion.getPresionSistolica() < umbral.getSistolicaMin()) {
+                alterado = true;
+            }
+        }
+
+        if (medicion.getPresionDiastolica() != null) {
+            if (umbral.getDiastolicaMax() != null && medicion.getPresionDiastolica() > umbral.getDiastolicaMax()) {
+                alterado = true;
+            }
+            if (umbral.getDiastolicaMin() != null && medicion.getPresionDiastolica() < umbral.getDiastolicaMin()) {
+                alterado = true;
+            }
+        }
+
+        if (medicion.getTemperatura() != null) {
+            if (umbral.getTemperaturaMax() != null
+                    && medicion.getTemperatura().compareTo(umbral.getTemperaturaMax()) > 0) {
+                alterado = true;
+            }
+            if (umbral.getTemperaturaMin() != null
+                    && medicion.getTemperatura().compareTo(umbral.getTemperaturaMin()) < 0) {
+                alterado = true;
+            }
+        }
+
+        return alterado;
+    }
+
+    /**
+     * Obtiene, ordenadas de más reciente a más antigua, las fechas en las que
+     * hubo al menos un signo vital alterado.
+     *
+     * <p>Visibilidad de paquete para poder testear este algoritmo directamente.</p>
+     */
+    List<LocalDateTime> obtenerFechasVitalesAlteradas(List<MedicionVitales> mediciones, UmbralMedico umbral) {
+        return mediciones.stream()
+                .filter(medicion -> estanVitalesAlterados(medicion, umbral))
+                .map(MedicionVitales::getFechaHora)
+                .filter(java.util.Objects::nonNull)
+                .sorted(Comparator.reverseOrder())
+                .toList();
     }
 
     /**

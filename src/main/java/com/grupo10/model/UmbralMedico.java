@@ -24,4 +24,7 @@ public class UmbralMedico {
     private Integer sistolicaMax;
     private Integer diastolicaMax;
     private BigDecimal temperaturaMax;
+    private Integer sistolicaMin;
+    private Integer diastolicaMin;
+    private BigDecimal temperaturaMin;
 }

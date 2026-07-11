@@ -28,7 +28,8 @@ public class UmbralService {
     public static UmbralMedico obtenerUmbralesPorPaciente(Long idPaciente) {
         String sql = """
                 SELECT id_umbral, id_paciente, glucosa_max, glucosa_min,
-                       sistolica_max, diastolica_max, temperatura_max
+                       sistolica_max, diastolica_max, temperatura_max,
+                       sistolica_min, diastolica_min, temperatura_min
                 FROM tb_umbral_medico
                 WHERE id_paciente = ?
                 """;
@@ -48,6 +49,9 @@ public class UmbralService {
                             .sistolicaMax(rs.getObject("sistolica_max", Integer.class))
                             .diastolicaMax(rs.getObject("diastolica_max", Integer.class))
                             .temperaturaMax(rs.getBigDecimal("temperatura_max"))
+                            .sistolicaMin(rs.getObject("sistolica_min", Integer.class))
+                            .diastolicaMin(rs.getObject("diastolica_min", Integer.class))
+                            .temperaturaMin(rs.getBigDecimal("temperatura_min"))
                             .build();
                 }
             }

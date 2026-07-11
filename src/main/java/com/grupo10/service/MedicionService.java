@@ -51,10 +51,12 @@ public class MedicionService {
             
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
+                    Timestamp fechaHora = rs.getTimestamp("fecha_hora");
                     mediciones.add(MedicionGlucosa.builder()
                         .idControl(rs.getLong("id_control"))
                         .glucosa(rs.getInt("glucosa"))
                         .periodo(rs.getString("periodo"))
+                        .fechaHora(fechaHora != null ? fechaHora.toLocalDateTime() : null)
                         .build());
                 }
             }
@@ -96,12 +98,14 @@ public class MedicionService {
             
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
+                    Timestamp fechaHora = rs.getTimestamp("fecha_hora");
                     mediciones.add(MedicionVitales.builder()
                         .idControl(rs.getLong("id_control"))
                         .presionSistolica(rs.getObject("presion_sistolica", Integer.class))
                         .presionDiastolica(rs.getObject("presion_diastolica", Integer.class))
                         .temperatura(rs.getBigDecimal("temperatura"))
                         .peso(rs.getBigDecimal("peso"))
+                        .fechaHora(fechaHora != null ? fechaHora.toLocalDateTime() : null)
                         .build());
                 }
             }

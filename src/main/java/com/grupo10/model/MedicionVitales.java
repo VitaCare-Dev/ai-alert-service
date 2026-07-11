@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 /**
  * Representa las mediciones de signos vitales de un paciente.
@@ -22,4 +23,5 @@ public class MedicionVitales {
     private Integer presionDiastolica;
     private BigDecimal temperatura;
     private BigDecimal peso;
+    private LocalDateTime fechaHora;
 }

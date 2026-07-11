@@ -41,6 +41,9 @@ class UmbralServiceTest {
         when(rs.getObject("sistolica_max", Integer.class)).thenReturn(140);
         when(rs.getObject("diastolica_max", Integer.class)).thenReturn(90);
         when(rs.getBigDecimal("temperatura_max")).thenReturn(new BigDecimal("38.0"));
+        when(rs.getObject("sistolica_min", Integer.class)).thenReturn(90);
+        when(rs.getObject("diastolica_min", Integer.class)).thenReturn(60);
+        when(rs.getBigDecimal("temperatura_min")).thenReturn(new BigDecimal("35.0"));
 
         try (MockedStatic<DatabaseConfig> dbMock = mockStatic(DatabaseConfig.class)) {
             dbMock.when(DatabaseConfig::getConnection).thenReturn(conn);
@@ -50,6 +53,9 @@ class UmbralServiceTest {
             assertEquals(180, umbral.getGlucosaMax());
             assertEquals(70, umbral.getGlucosaMin());
             assertEquals(new BigDecimal("38.0"), umbral.getTemperaturaMax());
+            assertEquals(90, umbral.getSistolicaMin());
+            assertEquals(60, umbral.getDiastolicaMin());
+            assertEquals(new BigDecimal("35.0"), umbral.getTemperaturaMin());
         }
     }
 

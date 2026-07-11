@@ -44,6 +44,7 @@ class MedicionServiceTest {
         when(rs.getLong("id_control")).thenReturn(1L);
         when(rs.getInt("glucosa")).thenReturn(180);
         when(rs.getString("periodo")).thenReturn("AYUNAS");
+        when(rs.getTimestamp("fecha_hora")).thenReturn(Timestamp.valueOf(LocalDateTime.of(2026, 7, 10, 8, 0)));
 
         try (MockedStatic<DatabaseConfig> dbMock = mockStatic(DatabaseConfig.class)) {
             dbMock.when(DatabaseConfig::getConnection).thenReturn(conn);
@@ -53,6 +54,7 @@ class MedicionServiceTest {
             assertEquals(1, resultado.size());
             assertEquals(180, resultado.get(0).getGlucosa());
             assertEquals("AYUNAS", resultado.get(0).getPeriodo());
+            assertEquals(LocalDateTime.of(2026, 7, 10, 8, 0), resultado.get(0).getFechaHora());
         }
     }
 
@@ -98,6 +100,7 @@ class MedicionServiceTest {
         when(rs.getObject("presion_diastolica", Integer.class)).thenReturn(95);
         when(rs.getBigDecimal("temperatura")).thenReturn(new BigDecimal("38.2"));
         when(rs.getBigDecimal("peso")).thenReturn(new BigDecimal("70.5"));
+        when(rs.getTimestamp("fecha_hora")).thenReturn(Timestamp.valueOf(LocalDateTime.of(2026, 7, 10, 9, 0)));
 
         try (MockedStatic<DatabaseConfig> dbMock = mockStatic(DatabaseConfig.class)) {
             dbMock.when(DatabaseConfig::getConnection).thenReturn(conn);
@@ -107,6 +110,7 @@ class MedicionServiceTest {
             assertEquals(1, resultado.size());
             assertEquals(150, resultado.get(0).getPresionSistolica());
             assertEquals(new BigDecimal("38.2"), resultado.get(0).getTemperatura());
+            assertEquals(LocalDateTime.of(2026, 7, 10, 9, 0), resultado.get(0).getFechaHora());
         }
     }
 

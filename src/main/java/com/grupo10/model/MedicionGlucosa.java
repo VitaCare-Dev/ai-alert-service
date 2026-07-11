@@ -1,5 +1,7 @@
 package com.grupo10.model;
 
+import java.time.LocalDateTime;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,4 +20,5 @@ public class MedicionGlucosa {
     private Long idControl;
     private Integer glucosa;
     private String periodo;
+    private LocalDateTime fechaHora;
 }

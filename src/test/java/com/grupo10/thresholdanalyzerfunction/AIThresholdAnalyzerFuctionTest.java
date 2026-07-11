@@ -147,6 +147,66 @@ class AIThresholdAnalyzerFuctionTest {
         assertEquals(0, function.contarMedicionesVitalesAlteradas(mediciones, umbral));
     }
 
+    @Test
+    void contarMedicionesVitalesAlteradas_detectaHipotensionEHipotermia() {
+        // DEF-AI-02: antes no existían umbrales mínimos, así que un paciente en
+        // shock (presión muy baja) o con hipotermia nunca generaba alerta.
+        UmbralMedico umbral = UmbralMedico.builder()
+                .sistolicaMin(90)
+                .diastolicaMin(60)
+                .temperaturaMin(new BigDecimal("35.0"))
+                .build();
+
+        List<MedicionVitales> mediciones = List.of(
+                MedicionVitales.builder().presionSistolica(60).build(), // hipotensión sistólica
+                MedicionVitales.builder().presionDiastolica(40).build(), // hipotensión diastólica
+                MedicionVitales.builder().temperatura(new BigDecimal("34.0")).build(), // hipotermia
+                MedicionVitales.builder().presionSistolica(120).presionDiastolica(80)
+                        .temperatura(new BigDecimal("36.5")).build() // normal
+        );
+
+        assertEquals(3, function.contarMedicionesVitalesAlteradas(mediciones, umbral));
+    }
+
+    // ---- obtenerFechasGlucosaAlterada / obtenerFechasVitalesAlteradas ----
+
+    @Test
+    void obtenerFechasGlucosaAlterada_devuelveSoloLasFechasDeMedicionesFueraDeRangoOrdenadasDescendente() {
+        UmbralMedico umbral = UmbralMedico.builder().glucosaMin(70).glucosaMax(180).build();
+        List<MedicionGlucosa> mediciones = List.of(
+                MedicionGlucosa.builder().glucosa(100).fechaHora(LocalDateTime.of(2026, 7, 9, 8, 0)).build(), // normal
+                MedicionGlucosa.builder().glucosa(300).fechaHora(LocalDateTime.of(2026, 7, 8, 8, 0)).build(), // alterada
+                MedicionGlucosa.builder().glucosa(320).fechaHora(LocalDateTime.of(2026, 7, 10, 8, 0)).build() // alterada
+        );
+
+        List<LocalDateTime> resultado = function.obtenerFechasGlucosaAlterada(mediciones, umbral);
+
+        assertEquals(List.of(
+                LocalDateTime.of(2026, 7, 10, 8, 0),
+                LocalDateTime.of(2026, 7, 8, 8, 0)), resultado);
+    }
+
+    @Test
+    void obtenerFechasGlucosaAlterada_ignoraMedicionesSinFechaHora() {
+        UmbralMedico umbral = UmbralMedico.builder().glucosaMax(180).build();
+        List<MedicionGlucosa> mediciones = List.of(
+                MedicionGlucosa.builder().glucosa(300).fechaHora(null).build());
+
+        assertTrue(function.obtenerFechasGlucosaAlterada(mediciones, umbral).isEmpty());
+    }
+
+    @Test
+    void obtenerFechasVitalesAlteradas_devuelveSoloLasFechasDeMedicionesFueraDeRango() {
+        UmbralMedico umbral = UmbralMedico.builder().sistolicaMax(140).build();
+        List<MedicionVitales> mediciones = List.of(
+                MedicionVitales.builder().presionSistolica(120).fechaHora(LocalDateTime.of(2026, 7, 9, 8, 0)).build(),
+                MedicionVitales.builder().presionSistolica(180).fechaHora(LocalDateTime.of(2026, 7, 10, 8, 0)).build());
+
+        List<LocalDateTime> resultado = function.obtenerFechasVitalesAlteradas(mediciones, umbral);
+
+        assertEquals(List.of(LocalDateTime.of(2026, 7, 10, 8, 0)), resultado);
+    }
+
     // ---- analizarPaciente (orquestación completa) ----
 
     @Test
@@ -159,50 +219,59 @@ class AIThresholdAnalyzerFuctionTest {
     }
 
     @Test
-    void analizarPaciente_noGeneraAlertaSiHayMenosDeDosMedicionesConsecutivas() {
+    void analizarPaciente_noGeneraAlertaSiSoloHayUnaMedicionAlteradaEnUnSoloDia() {
         UmbralMedico umbral = UmbralMedico.builder().glucosaMax(180).build();
 
         try (MockedStatic<UmbralService> umbralMock = mockStatic(UmbralService.class);
                 MockedStatic<MedicionService> medicionMock = mockStatic(MedicionService.class)) {
             umbralMock.when(() -> UmbralService.obtenerUmbralesPorPaciente(1L)).thenReturn(umbral);
-            medicionMock.when(() -> MedicionService.verificarMedicionesConsecutivas(1L, 3))
-                    .thenReturn(List.of(LocalDateTime.now()));
-
-            assertFalse(function.analizarPaciente(1L));
-        }
-    }
-
-    @Test
-    void analizarPaciente_noGeneraAlertaSiLasMedicionesNoSonEnDiasConsecutivos() {
-        UmbralMedico umbral = UmbralMedico.builder().glucosaMax(180).build();
-        List<LocalDateTime> fechasNoConsecutivas = Arrays.asList(
-                LocalDateTime.of(2026, 7, 10, 8, 0),
-                LocalDateTime.of(2026, 7, 1, 8, 0));
-
-        try (MockedStatic<UmbralService> umbralMock = mockStatic(UmbralService.class);
-                MockedStatic<MedicionService> medicionMock = mockStatic(MedicionService.class)) {
-            umbralMock.when(() -> UmbralService.obtenerUmbralesPorPaciente(1L)).thenReturn(umbral);
-            medicionMock.when(() -> MedicionService.verificarMedicionesConsecutivas(1L, 3))
-                    .thenReturn(fechasNoConsecutivas);
-
-            assertFalse(function.analizarPaciente(1L));
-        }
-    }
-
-    @Test
-    void analizarPaciente_noGeneraAlertaSiLasMedicionesEstanDentroDeRango() {
-        UmbralMedico umbral = UmbralMedico.builder().glucosaMin(70).glucosaMax(180).build();
-        List<LocalDateTime> fechasConsecutivas = Arrays.asList(
-                LocalDateTime.of(2026, 7, 10, 8, 0),
-                LocalDateTime.of(2026, 7, 9, 8, 0));
-
-        try (MockedStatic<UmbralService> umbralMock = mockStatic(UmbralService.class);
-                MockedStatic<MedicionService> medicionMock = mockStatic(MedicionService.class)) {
-            umbralMock.when(() -> UmbralService.obtenerUmbralesPorPaciente(1L)).thenReturn(umbral);
-            medicionMock.when(() -> MedicionService.verificarMedicionesConsecutivas(1L, 3))
-                    .thenReturn(fechasConsecutivas);
             medicionMock.when(() -> MedicionService.obtenerMedicionesGlucosaRecientes(1L, 3))
-                    .thenReturn(List.of(MedicionGlucosa.builder().glucosa(100).build()));
+                    .thenReturn(List.of(MedicionGlucosa.builder().glucosa(300)
+                            .fechaHora(LocalDateTime.of(2026, 7, 10, 8, 0)).build()));
+            medicionMock.when(() -> MedicionService.obtenerMedicionesVitalesRecientes(1L, 3))
+                    .thenReturn(Collections.emptyList());
+
+            assertFalse(function.analizarPaciente(1L));
+        }
+    }
+
+    @Test
+    void analizarPaciente_noGeneraAlertaSiLasMedicionesAlteradasNoSonEnDiasConsecutivos() {
+        // DEF-AI-01: dos mediciones de glucosa alteradas, pero en días muy
+        // separados entre sí (no consecutivos) -> no debe generar alerta.
+        UmbralMedico umbral = UmbralMedico.builder().glucosaMax(180).build();
+        List<MedicionGlucosa> glucosaAlteradaNoConsecutiva = List.of(
+                MedicionGlucosa.builder().glucosa(300).fechaHora(LocalDateTime.of(2026, 7, 10, 8, 0)).build(),
+                MedicionGlucosa.builder().glucosa(320).fechaHora(LocalDateTime.of(2026, 7, 1, 8, 0)).build());
+
+        try (MockedStatic<UmbralService> umbralMock = mockStatic(UmbralService.class);
+                MockedStatic<MedicionService> medicionMock = mockStatic(MedicionService.class)) {
+            umbralMock.when(() -> UmbralService.obtenerUmbralesPorPaciente(1L)).thenReturn(umbral);
+            medicionMock.when(() -> MedicionService.obtenerMedicionesGlucosaRecientes(1L, 3))
+                    .thenReturn(glucosaAlteradaNoConsecutiva);
+            medicionMock.when(() -> MedicionService.obtenerMedicionesVitalesRecientes(1L, 3))
+                    .thenReturn(Collections.emptyList());
+
+            assertFalse(function.analizarPaciente(1L));
+        }
+    }
+
+    @Test
+    void analizarPaciente_noGeneraAlertaSiHayDiasConsecutivosConMedicionesPeroNoAlteradas() {
+        // DEF-AI-01: el paciente sí tiene controles en días consecutivos, pero
+        // ninguno está alterado -> no debe generar alerta (antes del fix, el
+        // "día consecutivo" se calculaba sobre cualquier control, no sobre
+        // los realmente alterados).
+        UmbralMedico umbral = UmbralMedico.builder().glucosaMin(70).glucosaMax(180).build();
+        List<MedicionGlucosa> glucosaNormal = List.of(
+                MedicionGlucosa.builder().glucosa(100).fechaHora(LocalDateTime.of(2026, 7, 10, 8, 0)).build(),
+                MedicionGlucosa.builder().glucosa(110).fechaHora(LocalDateTime.of(2026, 7, 9, 8, 0)).build());
+
+        try (MockedStatic<UmbralService> umbralMock = mockStatic(UmbralService.class);
+                MockedStatic<MedicionService> medicionMock = mockStatic(MedicionService.class)) {
+            umbralMock.when(() -> UmbralService.obtenerUmbralesPorPaciente(1L)).thenReturn(umbral);
+            medicionMock.when(() -> MedicionService.obtenerMedicionesGlucosaRecientes(1L, 3))
+                    .thenReturn(glucosaNormal);
             medicionMock.when(() -> MedicionService.obtenerMedicionesVitalesRecientes(1L, 3))
                     .thenReturn(Collections.emptyList());
 
@@ -213,19 +282,14 @@ class AIThresholdAnalyzerFuctionTest {
     @Test
     void analizarPaciente_noGeneraUnaSegundaAlertaSiYaExisteUnaReciente() {
         UmbralMedico umbral = UmbralMedico.builder().glucosaMin(70).glucosaMax(180).build();
-        List<LocalDateTime> fechasConsecutivas = Arrays.asList(
-                LocalDateTime.of(2026, 7, 10, 8, 0),
-                LocalDateTime.of(2026, 7, 9, 8, 0));
         List<MedicionGlucosa> glucosaAlterada = List.of(
-                MedicionGlucosa.builder().glucosa(300).build(),
-                MedicionGlucosa.builder().glucosa(320).build());
+                MedicionGlucosa.builder().glucosa(300).fechaHora(LocalDateTime.of(2026, 7, 10, 8, 0)).build(),
+                MedicionGlucosa.builder().glucosa(320).fechaHora(LocalDateTime.of(2026, 7, 9, 8, 0)).build());
 
         try (MockedStatic<UmbralService> umbralMock = mockStatic(UmbralService.class);
                 MockedStatic<MedicionService> medicionMock = mockStatic(MedicionService.class);
                 MockedStatic<AlertaService> alertaMock = mockStatic(AlertaService.class)) {
             umbralMock.when(() -> UmbralService.obtenerUmbralesPorPaciente(1L)).thenReturn(umbral);
-            medicionMock.when(() -> MedicionService.verificarMedicionesConsecutivas(1L, 3))
-                    .thenReturn(fechasConsecutivas);
             medicionMock.when(() -> MedicionService.obtenerMedicionesGlucosaRecientes(1L, 3))
                     .thenReturn(glucosaAlterada);
             medicionMock.when(() -> MedicionService.obtenerMedicionesVitalesRecientes(1L, 3))
@@ -240,20 +304,15 @@ class AIThresholdAnalyzerFuctionTest {
     @Test
     void analizarPaciente_generaYGuardaUnaAlertaCuandoHayMedicionesAlteradasEnDiasConsecutivos() throws Exception {
         UmbralMedico umbral = UmbralMedico.builder().glucosaMin(70).glucosaMax(180).build();
-        List<LocalDateTime> fechasConsecutivas = Arrays.asList(
-                LocalDateTime.of(2026, 7, 10, 8, 0),
-                LocalDateTime.of(2026, 7, 9, 8, 0));
         List<MedicionGlucosa> glucosaAlterada = List.of(
-                MedicionGlucosa.builder().glucosa(300).build(),
-                MedicionGlucosa.builder().glucosa(320).build());
+                MedicionGlucosa.builder().glucosa(300).fechaHora(LocalDateTime.of(2026, 7, 10, 8, 0)).build(),
+                MedicionGlucosa.builder().glucosa(320).fechaHora(LocalDateTime.of(2026, 7, 9, 8, 0)).build());
 
         try (MockedStatic<UmbralService> umbralMock = mockStatic(UmbralService.class);
                 MockedStatic<MedicionService> medicionMock = mockStatic(MedicionService.class);
                 MockedStatic<AlertaService> alertaMock = mockStatic(AlertaService.class);
                 MockedStatic<GroqService> groqMock = mockStatic(GroqService.class)) {
             umbralMock.when(() -> UmbralService.obtenerUmbralesPorPaciente(1L)).thenReturn(umbral);
-            medicionMock.when(() -> MedicionService.verificarMedicionesConsecutivas(1L, 3))
-                    .thenReturn(fechasConsecutivas);
             medicionMock.when(() -> MedicionService.obtenerMedicionesGlucosaRecientes(1L, 3))
                     .thenReturn(glucosaAlterada);
             medicionMock.when(() -> MedicionService.obtenerMedicionesVitalesRecientes(1L, 3))
@@ -271,20 +330,15 @@ class AIThresholdAnalyzerFuctionTest {
     @Test
     void analizarPaciente_generaAlertaCuandoSonLosSignosVitalesLosAlteradosYNoLaGlucosa() throws Exception {
         UmbralMedico umbral = UmbralMedico.builder().sistolicaMax(140).build();
-        List<LocalDateTime> fechasConsecutivas = Arrays.asList(
-                LocalDateTime.of(2026, 7, 10, 8, 0),
-                LocalDateTime.of(2026, 7, 9, 8, 0));
         List<MedicionVitales> vitalesAlteradas = List.of(
-                MedicionVitales.builder().presionSistolica(180).build(),
-                MedicionVitales.builder().presionSistolica(190).build());
+                MedicionVitales.builder().presionSistolica(180).fechaHora(LocalDateTime.of(2026, 7, 10, 8, 0)).build(),
+                MedicionVitales.builder().presionSistolica(190).fechaHora(LocalDateTime.of(2026, 7, 9, 8, 0)).build());
 
         try (MockedStatic<UmbralService> umbralMock = mockStatic(UmbralService.class);
                 MockedStatic<MedicionService> medicionMock = mockStatic(MedicionService.class);
                 MockedStatic<AlertaService> alertaMock = mockStatic(AlertaService.class);
                 MockedStatic<GroqService> groqMock = mockStatic(GroqService.class)) {
             umbralMock.when(() -> UmbralService.obtenerUmbralesPorPaciente(1L)).thenReturn(umbral);
-            medicionMock.when(() -> MedicionService.verificarMedicionesConsecutivas(1L, 3))
-                    .thenReturn(fechasConsecutivas);
             medicionMock.when(() -> MedicionService.obtenerMedicionesGlucosaRecientes(1L, 3))
                     .thenReturn(Collections.emptyList());
             medicionMock.when(() -> MedicionService.obtenerMedicionesVitalesRecientes(1L, 3))
@@ -304,20 +358,15 @@ class AIThresholdAnalyzerFuctionTest {
         // Un fallo al consultar la IA o guardar no debe propagar la excepción:
         // generarAlerta la atrapa y analizarPaciente devuelve false.
         UmbralMedico umbral = UmbralMedico.builder().glucosaMin(70).glucosaMax(180).build();
-        List<LocalDateTime> fechasConsecutivas = Arrays.asList(
-                LocalDateTime.of(2026, 7, 10, 8, 0),
-                LocalDateTime.of(2026, 7, 9, 8, 0));
         List<MedicionGlucosa> glucosaAlterada = List.of(
-                MedicionGlucosa.builder().glucosa(300).build(),
-                MedicionGlucosa.builder().glucosa(320).build());
+                MedicionGlucosa.builder().glucosa(300).fechaHora(LocalDateTime.of(2026, 7, 10, 8, 0)).build(),
+                MedicionGlucosa.builder().glucosa(320).fechaHora(LocalDateTime.of(2026, 7, 9, 8, 0)).build());
 
         try (MockedStatic<UmbralService> umbralMock = mockStatic(UmbralService.class);
                 MockedStatic<MedicionService> medicionMock = mockStatic(MedicionService.class);
                 MockedStatic<AlertaService> alertaMock = mockStatic(AlertaService.class);
                 MockedStatic<GroqService> groqMock = mockStatic(GroqService.class)) {
             umbralMock.when(() -> UmbralService.obtenerUmbralesPorPaciente(1L)).thenReturn(umbral);
-            medicionMock.when(() -> MedicionService.verificarMedicionesConsecutivas(1L, 3))
-                    .thenReturn(fechasConsecutivas);
             medicionMock.when(() -> MedicionService.obtenerMedicionesGlucosaRecientes(1L, 3))
                     .thenReturn(glucosaAlterada);
             medicionMock.when(() -> MedicionService.obtenerMedicionesVitalesRecientes(1L, 3))
